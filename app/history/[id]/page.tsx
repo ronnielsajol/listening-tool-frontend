@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { client } from "../../api/apify";
+import { getRun, getKVRecord, getDatasetItems } from "../../api/apify";
 import ChatPanel from "./ChatPanel";
 
 interface Comment {
@@ -34,30 +34,22 @@ function parseLikes(likesCount: unknown): number {
 async function getRunData(id: string) {
 	let run: RunDetails;
 	try {
-		const result = await client.run(id).get();
-		if (!result) return null;
-		run = result as unknown as RunDetails;
+		run = (await getRun(id)) as RunDetails;
 	} catch {
 		return null;
 	}
 
-	const [inputRecord, dataset] = await Promise.all([
-		client
-			.keyValueStore(run.defaultKeyValueStoreId)
-			.getRecord("INPUT")
-			.catch(() => null),
-		client
-			.dataset(run.defaultDatasetId)
-			.listItems()
-			.catch(() => ({ items: [] })),
+	const [inputRecord, datasetItems] = await Promise.all([
+		getKVRecord(run.defaultKeyValueStoreId, "INPUT").catch(() => null),
+		getDatasetItems(run.defaultDatasetId).catch(() => [] as unknown[]),
 	]);
 
-	const input = inputRecord?.value as { startUrls?: { url: string }[] } | null;
+	const input = inputRecord as { startUrls?: { url: string }[] } | null;
 	const inputUrl = input?.startUrls?.[0]?.url ?? null;
 
-	const comments = (dataset.items as Comment[]).filter((item) => parseLikes(item.likesCount) > 1);
+	const comments = (datasetItems as Comment[]).filter((item) => parseLikes(item.likesCount) > 1);
 
-	const firstItem = dataset.items[0] as Record<string, unknown> | undefined;
+	const firstItem = datasetItems[0] as Record<string, unknown> | undefined;
 	const postTitle =
 		(firstItem?.postTitle as string | undefined) ??
 		(firstItem?.pageTitle as string | undefined) ??

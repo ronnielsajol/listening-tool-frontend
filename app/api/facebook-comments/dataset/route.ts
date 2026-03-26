@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { client } from "../../apify";
+import { getDatasetItems } from "../../apify";
 
 export async function GET(request: NextRequest) {
 	const datasetId = request.nextUrl.searchParams.get("datasetId");
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 	}
 
 	try {
-		const { items } = await client.dataset(datasetId).listItems();
+		const items = await getDatasetItems(datasetId);
 
 		const filtered = items.filter((item) => {
 			const likes = parseInt(String((item as Record<string, unknown>).likesCount ?? "0"), 10);
@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
 
 		return Response.json({ items: filtered });
 	} catch (err) {
-		console.error("Apify dataset error:", err);
-		return Response.json({ error: "Failed to fetch dataset" }, { status: 500 });
+		const message = err instanceof Error ? err.message : String(err);
+		console.error("Apify dataset error:", message);
+		return Response.json({ error: `Failed to fetch dataset: ${message}` }, { status: 500 });
 	}
 }

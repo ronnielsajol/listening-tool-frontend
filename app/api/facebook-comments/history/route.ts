@@ -1,17 +1,16 @@
-import { client } from "../../apify";
+import { listActorRuns, getKVRecord, ACTOR_ID, ApifyRun } from "../../apify";
 
 export async function GET() {
 	try {
-		const { items: runs } = await client.actor("us5srxAYnsrkgUv2v").runs().list({ limit: 20, desc: true });
+		const runs = await listActorRuns(ACTOR_ID, 20);
 
 		// Fetch the scraped URL from each run's INPUT record in parallel
 		const runsWithInput = await Promise.all(
 			runs.map(async (run) => {
 				try {
-					const record = await client
-						.keyValueStore((run as unknown as Record<string, string>).defaultKeyValueStoreId)
-						.getRecord("INPUT");
-					const input = record?.value as { startUrls?: { url: string }[] } | null;
+					const input = (await getKVRecord((run as ApifyRun).defaultKeyValueStoreId, "INPUT")) as {
+						startUrls?: { url: string }[];
+					} | null;
 					const inputUrl = input?.startUrls?.[0]?.url ?? null;
 					return { ...run, inputUrl };
 				} catch {
@@ -22,7 +21,8 @@ export async function GET() {
 
 		return Response.json({ runs: runsWithInput });
 	} catch (err) {
-		console.error("Apify history error:", err);
-		return Response.json({ error: "Failed to fetch run history" }, { status: 500 });
+		const message = err instanceof Error ? err.message : String(err);
+		console.error("Apify history error:", message);
+		return Response.json({ error: `Failed to fetch run history: ${message}` }, { status: 500 });
 	}
 }

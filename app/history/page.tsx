@@ -1,22 +1,15 @@
 import Link from "next/link";
-import { client } from "../api/apify";
-
-interface RunRaw {
-	id: string;
-	status: string;
-	startedAt: string;
-	defaultKeyValueStoreId: string;
-	defaultDatasetId: string;
-}
+import { listActorRuns, getKVRecord, ACTOR_ID, ApifyRun } from "../api/apify";
 
 async function getRuns() {
-	const { items } = await client.actor("us5srxAYnsrkgUv2v").runs().list({ limit: 30, desc: true });
+	const items = await listActorRuns(ACTOR_ID, 30);
 
 	const runs = await Promise.all(
-		(items as unknown as RunRaw[]).map(async (run) => {
+		items.map(async (run) => {
 			try {
-				const record = await client.keyValueStore(run.defaultKeyValueStoreId).getRecord("INPUT");
-				const input = record?.value as { startUrls?: { url: string }[] } | null;
+				const input = (await getKVRecord((run as ApifyRun).defaultKeyValueStoreId, "INPUT")) as {
+					startUrls?: { url: string }[];
+				} | null;
 				return { ...run, inputUrl: input?.startUrls?.[0]?.url ?? null };
 			} catch {
 				return { ...run, inputUrl: null };

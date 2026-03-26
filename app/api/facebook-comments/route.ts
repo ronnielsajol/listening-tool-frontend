@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { client } from "../apify";
+import { startActorRun, ACTOR_ID } from "../apify";
 
 export async function POST(request: NextRequest) {
 	let body: unknown;
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 		};
 
 		// Start the actor without waiting — avoids Vercel function timeout
-		const run = await client.actor("us5srxAYnsrkgUv2v").start(input);
+		const run = await startActorRun(ACTOR_ID, input);
 
 		return Response.json({ runId: run.id });
 	} catch (err) {

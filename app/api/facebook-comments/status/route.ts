@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { client } from "../../apify";
+import { getRun, getDatasetItems } from "../../apify";
 
 export async function GET(request: NextRequest) {
 	const runId = request.nextUrl.searchParams.get("runId");
@@ -9,11 +9,7 @@ export async function GET(request: NextRequest) {
 	}
 
 	try {
-		const run = await client.run(runId).get();
-
-		if (!run) {
-			return Response.json({ error: "Run not found" }, { status: 404 });
-		}
+		const run = await getRun(runId);
 
 		if (run.status === "RUNNING" || run.status === "READY") {
 			return Response.json({ status: run.status });
@@ -24,7 +20,7 @@ export async function GET(request: NextRequest) {
 		}
 
 		// SUCCEEDED — fetch and filter the dataset
-		const { items } = await client.dataset(run.defaultDatasetId).listItems();
+		const items = await getDatasetItems(run.defaultDatasetId);
 
 		const filtered = items.filter((item) => {
 			const likes = parseInt(String((item as Record<string, unknown>).likesCount ?? "0"), 10);
@@ -33,7 +29,8 @@ export async function GET(request: NextRequest) {
 
 		return Response.json({ status: run.status, items: filtered });
 	} catch (err) {
-		console.error("Apify status check error:", err);
-		return Response.json({ error: "Failed to check run status" }, { status: 500 });
+		const message = err instanceof Error ? err.message : String(err);
+		console.error("Apify status check error:", message);
+		return Response.json({ error: `Failed to check run status: ${message}` }, { status: 500 });
 	}
 }
