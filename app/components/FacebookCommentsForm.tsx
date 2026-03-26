@@ -67,6 +67,7 @@ export default function FacebookCommentsForm() {
 	const [url, setUrl] = useState("");
 	const [resultsLimit, setResultsLimit] = useState(100);
 	const [loading, setLoading] = useState(false);
+	const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
 	const [comments, setComments] = useState<Comment[] | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
@@ -80,25 +81,58 @@ export default function FacebookCommentsForm() {
 		setError(null);
 		setComments(null);
 		setLoading(true);
+		setLoadingStatus("Starting scrape…");
 
 		try {
-			const res = await fetch("/api/facebook-comments", {
+			// Step 1: start the actor run
+			const startRes = await fetch("/api/facebook-comments", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ url, resultsLimit }),
 			});
 
-			const data = await res.json();
+			const startData = await startRes.json();
 
-			if (!res.ok) {
-				setError(data.error ?? "Something went wrong");
-			} else {
-				setComments(data.items as Comment[]);
+			if (!startRes.ok) {
+				setError(startData.error ?? "Something went wrong");
+				return;
 			}
+
+			const { runId } = startData as { runId: string };
+
+			// Step 2: poll until the run finishes
+			let attempts = 0;
+			const maxAttempts = 120; // 10 minutes max at 5s intervals
+			while (attempts < maxAttempts) {
+				await new Promise((r) => setTimeout(r, 5000));
+				attempts++;
+				setLoadingStatus(`Scraping… (${attempts * 5}s elapsed)`);
+
+				const pollRes = await fetch(`/api/facebook-comments/status?runId=${encodeURIComponent(runId)}`);
+				const pollData = await pollRes.json();
+
+				if (!pollRes.ok) {
+					setError(pollData.error ?? "Scrape failed");
+					return;
+				}
+
+				if (pollData.status === "SUCCEEDED") {
+					setComments(pollData.items as Comment[]);
+					return;
+				}
+
+				if (pollData.status !== "RUNNING" && pollData.status !== "READY") {
+					setError(`Scrape ended with status: ${pollData.status}`);
+					return;
+				}
+			}
+
+			setError("Scrape timed out. Try again or check history.");
 		} catch {
 			setError("Network error. Please try again.");
 		} finally {
 			setLoading(false);
+			setLoadingStatus(null);
 		}
 	}
 
@@ -176,7 +210,7 @@ export default function FacebookCommentsForm() {
 								type='submit'
 								disabled={loading}
 								className='rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed'>
-								{loading ? "Loading…" : "Scrape"}
+								{loading ? (loadingStatus ?? "Loading…") : "Scrape"}
 							</button>
 						</div>
 						<p className='text-xs text-zinc-400 dark:text-zinc-500'>

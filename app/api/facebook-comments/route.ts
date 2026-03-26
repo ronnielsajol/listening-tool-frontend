@@ -41,17 +41,12 @@ export async function POST(request: NextRequest) {
 			viewOption: "RANKED_UNFILTERED",
 		};
 
-		const run = await client.actor("us5srxAYnsrkgUv2v").call(input);
-		const { items } = await client.dataset(run.defaultDatasetId).listItems();
+		// Start the actor without waiting — avoids Vercel function timeout
+		const run = await client.actor("us5srxAYnsrkgUv2v").start(input);
 
-		const filtered = items.filter((item) => {
-			const likes = parseInt(String((item as Record<string, unknown>).likesCount ?? "0"), 10);
-			return likes > 1;
-		});
-
-		return Response.json({ items: filtered });
+		return Response.json({ runId: run.id });
 	} catch (err) {
 		console.error("Apify actor error:", err);
-		return Response.json({ error: "Failed to fetch comments from Apify" }, { status: 500 });
+		return Response.json({ error: "Failed to start Apify actor" }, { status: 500 });
 	}
 }
