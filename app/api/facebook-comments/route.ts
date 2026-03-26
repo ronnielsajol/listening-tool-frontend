@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
 
 		return Response.json({ runId: run.id });
 	} catch (err) {
-		console.error("Apify actor error:", err);
-		return Response.json({ error: "Failed to start Apify actor" }, { status: 500 });
+		const message = err instanceof Error ? err.message : String(err);
+		console.error("Apify actor error:", message);
+		return Response.json({ error: `Failed to start Apify actor: ${message}` }, { status: 500 });
 	}
 }
