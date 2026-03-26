@@ -37,6 +37,7 @@ export default function ChatPanel({
 	const [loading, setLoading] = useState(false);
 	const [sending, setSending] = useState(false);
 	const [sendStatus, setSendStatus] = useState<"idle" | "ok" | "error">("idle");
+	const [topic, setTopic] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -115,7 +116,7 @@ export default function ChatPanel({
 
 	async function handleSendToN8n() {
 		const lastAiMessage = [...messages].reverse().find((m) => m.role === "assistant");
-		if (!lastAiMessage || !N8N_WEBHOOK) return;
+		if (!lastAiMessage || !N8N_WEBHOOK || !topic.trim()) return;
 		setSending(true);
 		setSendStatus("idle");
 		try {
@@ -124,6 +125,7 @@ export default function ChatPanel({
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					summary: lastAiMessage.content,
+					topic: topic.trim(),
 					postTitle,
 					postLink,
 					postDate,
@@ -177,13 +179,22 @@ export default function ChatPanel({
 		<div className='flex flex-col gap-4'>
 			<div className='flex justify-end gap-2'>
 				{messages.some((m) => m.role === "assistant") && (
-					<button
-						type='button'
-						onClick={handleSendToN8n}
-						disabled={sending || !N8N_WEBHOOK}
-						className='rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed'>
-						{sending ? "Sending…" : sendStatus === "ok" ? "✓ Sent" : sendStatus === "error" ? "Failed – Retry" : "📤 Send to n8n"}
-					</button>
+					<>
+						<input
+							type='text'
+							value={topic}
+							onChange={(e) => setTopic(e.target.value)}
+							placeholder='Topic (required)'
+							className='rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-violet-400 w-44'
+						/>
+						<button
+							type='button'
+							onClick={handleSendToN8n}
+							disabled={sending || !N8N_WEBHOOK || !topic.trim()}
+							className='rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed'>
+							{sending ? "Sending…" : sendStatus === "ok" ? "✓ Sent" : sendStatus === "error" ? "Failed – Retry" : "📤 Send to n8n"}
+						</button>
+					</>
 				)}
 				<button
 					type='button'
